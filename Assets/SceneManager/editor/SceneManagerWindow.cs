@@ -33,6 +33,7 @@ public sealed class SceneManagerWindow : EditorWindow
         _sceneCollection.UpdateRelativePaths();
 
         SceneView.onSceneGUIDelegate += OnSceneGUI;
+        SceneChange.OnSceneChange += UpdateScenePreviewImage;
 
     }
 
@@ -98,55 +99,92 @@ public sealed class SceneManagerWindow : EditorWindow
 
     private void DrawSceneMap(Rect renderArea)
     {
-        SceneData data;
         Rect rectWithOffset = new Rect();
 
-        if (Event.current.type == EventType.MouseDown && Event.current.button == 0)
+        int i;
+        switch (Event.current.type)
         {
-            _selectedSceneIndex = -1;
-        }
-        _hoverSceneIndex = -1;
-
-        Handles.BeginGUI();
-        for (int i = 0;  i < _asset.Count; i++)
-        {
-            data = _asset[i];
-            rectWithOffset.x = data.rectangle.x + position.width * .5f;
-            rectWithOffset.y =  position.height * .5f - data.rectangle.y;
-            rectWithOffset.width = data.rectangle.width;
-            rectWithOffset.height = data.rectangle.height;
-
-            if (rectWithOffset.Contains(Event.current.mousePosition))
-            {
-                if (Event.current.type == EventType.MouseDown &&
-                    Event.current.button == 0)
+            case EventType.mouseMove:
+                _hoverSceneIndex = -1;
+                for (i = 0; i < _asset.Count; i++)
                 {
-                    if (Event.current.clickCount == 2)
+                    rectWithOffset = GetRectWithScreenOffset(_asset[i].rectangle);
+
+                    if (rectWithOffset.Contains(Event.current.mousePosition))
                     {
-                        if (_sceneCollection.SceneExists(_asset[i].name) &&
-                            EditorUtility.DisplayDialog("Open Scene", "Are you sure you want to open the scene?", "Yes", "No"))
-                                EditorApplication.OpenScene(_sceneCollection.GetRelativeScenePath(_asset[i].name));                        
+                        _hoverSceneIndex = i;
+                        break;
+                    }
+                }
+                break;
+            case EventType.mouseDown:
+                //  The left button has been clicked so deselect the current scene if it exists
+                if (Event.current.button == 0)
+                    _selectedSceneIndex = -1;
+
+                for (i = 0; i < _asset.Count; i++)
+                {
+                    rectWithOffset = GetRectWithScreenOffset(_asset[i].rectangle);
+
+                    if (rectWithOffset.Contains(Event.current.mousePosition))
+                    {
+                        if (Event.current.type == EventType.MouseDown && Event.current.button == 0)
+                        {
+                            _selectedSceneIndex = i;
+
+                            if (Event.current.clickCount == 2)
+                            {
+                                if (_sceneCollection.SceneExists(_asset[i].name) &&
+                                    EditorUtility.DisplayDialog("Open Scene",
+                                        "Are you sure you want to open the scene?", "Yes", "No"))
+                                {
+                                    EditorApplication.OpenScene(_sceneCollection.GetRelativeScenePath(_asset[i].name));
+                                }
+                            }
+                        }
+                    }
+                }
+                break;
+            case EventType.repaint:
+                SceneData data = null;
+                Handles.BeginGUI();
+                for (i = 0; i < _asset.Count; i++)
+                {
+                    data = _asset[i];
+                    rectWithOffset = GetRectWithScreenOffset(_asset[i].rectangle);
+
+                    if (Event.current.type == EventType.repaint &&
+                        !string.IsNullOrEmpty(data.name) && _previewCollection.ContainsKey(data.name))
+                    {
+                        if (_previewCollection.ContainsKey(data.name))
+                            GUI.DrawTexture(rectWithOffset, _previewCollection[data.name]);
                     }
 
-                    _selectedSceneIndex = i;
+                    if (_showSceneNames)
+                        GUI.Label(rectWithOffset, string.IsNullOrEmpty(data.name) ? "<NO SCENE>" : data.name);
+
+                    DrawSceneRect(rectWithOffset, i);
                 }
+                Handles.EndGUI();
+                break;
 
-                _hoverSceneIndex = i;
-            }
-
-            if (Event.current.type == EventType.repaint &&
-                !string.IsNullOrEmpty(data.name) && _previewCollection.ContainsKey(data.name))
-            {
-                if (_previewCollection.ContainsKey(data.name))
-                    GUI.DrawTexture(rectWithOffset, _previewCollection[data.name]);
-            }
-
-            if (_showSceneNames)
-                GUI.Label(rectWithOffset, string.IsNullOrEmpty(data.name) ? "<NO SCENE>" : data.name);
-
-            DrawSceneRect(rectWithOffset, i);
         }
-        Handles.EndGUI();
+    }
+
+    private Rect GetRectWithScreenOffset(SceneData data)
+    {
+        return GetRectWithScreenOffset(data.rectangle);
+    }
+
+    private Rect GetRectWithScreenOffset(Rect rect)
+    {
+        var result = new Rect();
+        result.x = rect.x + position.width * .5f;
+        result.y = position.height * .5f - rect.y;
+        result.width  = rect.width;
+        result.height = rect.height;
+
+        return result;
     }
 
     private void DrawSceneRect(Rect rect, int index)
@@ -204,12 +242,12 @@ public sealed class SceneManagerWindow : EditorWindow
             DontDestroyOnLoad(newCamera);
 
             _windowCamera = newCamera.AddComponent<Camera>();
+            _windowCamera.backgroundColor = new Color(49, 77, 121, 1);
+            _windowCamera.clearFlags = CameraClearFlags.Skybox;
         }
 
         _windowCamera.enabled = false;
         _windowCamera.orthographic = true;
-        _windowCamera.backgroundColor = new Color(49, 77, 121, 1);
-        _windowCamera.clearFlags = CameraClearFlags.Skybox;
     }
 
     private void UpdateTexturePreviewCache()
@@ -226,42 +264,53 @@ public sealed class SceneManagerWindow : EditorWindow
             var sceneData = _asset.TryFindScene(_sceneCollection[i]);
 
             if (sceneData == null)
-            {
-                Debug.Log("sceneData is null");
                 continue;
-            }
 
             if (!_sceneCollection.SceneExists(sceneData.name))
                 continue;
-            
-            EditorApplication.OpenScene(_sceneCollection.GetRelativeScenePath(sceneData.name));
 
-            var aspect = sceneData.rectangle.width / sceneData.rectangle.height;
+            if (EditorApplication.currentScene != _sceneCollection.GetRelativeScenePath(sceneData.name))
+                EditorApplication.OpenScene(_sceneCollection.GetRelativeScenePath(sceneData.name));
 
-            _windowCamera.aspect = aspect;
-            _windowCamera.orthographicSize = sceneData.rectangle.height * .5f;
-            _windowCamera.transform.position = new Vector3(sceneData.rectangle.center.x, sceneData.rectangle.y - sceneData.rectangle.height*.5f, -10);
-
-            var tempRT = RenderTexture.GetTemporary((int)sceneData.rectangle.width, (int)sceneData.rectangle.height, 16);
-            RenderTexture.active = tempRT;
-
-            _windowCamera.targetTexture = tempRT;
-            _windowCamera.Render();
-
-            var image = new Texture2D(tempRT.width, tempRT.height, TextureFormat.ARGB32, false);
-            image.hideFlags = HideFlags.HideAndDontSave;
-            image.ReadPixels(new Rect(0, 0, image.width, image.height), 0, 0, false);
-            image.Apply();
-
-            _previewCollection.Add(sceneData.name, image);
-
-            RenderTexture.active = null;
-            RenderTexture.ReleaseTemporary(tempRT);
+            UpdateScenePreviewImage(sceneData);
         }
 
         Resources.UnloadUnusedAssets();
-        EditorApplication.OpenScene(startScene);
+        if (EditorApplication.currentScene != startScene)
+            EditorApplication.OpenScene(startScene);
         Repaint();
+    }
+
+    private void UpdateScenePreviewImage(string sceneName)
+    {
+        var scene = _asset.TryFindScene(sceneName);
+        if (scene != null)
+            UpdateScenePreviewImage(scene);
+    }
+
+    private void UpdateScenePreviewImage(SceneData sceneData)
+    {
+        SetUpCamera();
+
+        _windowCamera.aspect = sceneData.rectangle.width / sceneData.rectangle.height;
+        _windowCamera.orthographicSize = sceneData.rectangle.height * .5f;
+        _windowCamera.transform.position = new Vector3(sceneData.rectangle.center.x, sceneData.rectangle.y - sceneData.rectangle.height * .5f, -10);
+
+        var tempRT = RenderTexture.GetTemporary((int)sceneData.rectangle.width, (int)sceneData.rectangle.height, 16);
+        RenderTexture.active = tempRT;
+
+        _windowCamera.targetTexture = tempRT;
+        _windowCamera.Render();
+
+        var image = new Texture2D(tempRT.width, tempRT.height, TextureFormat.ARGB32, false);
+        image.hideFlags = HideFlags.HideAndDontSave;
+        image.ReadPixels(new Rect(0, 0, image.width, image.height), 0, 0, false);
+        image.Apply();
+
+        _previewCollection.Add(sceneData.name, image);
+
+        RenderTexture.active = null;
+        RenderTexture.ReleaseTemporary(tempRT);
     }
 
     private void HandleSceneManagerAssetDrop()
