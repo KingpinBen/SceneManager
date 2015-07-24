@@ -1,4 +1,6 @@
-﻿using UnityEngine;
+﻿#define _DEBUG
+
+using UnityEngine;
 using UnityEditor;
 using System.Collections.Generic;
 using System.IO;
@@ -17,6 +19,8 @@ public sealed class SceneManagerWindow : EditorWindow
     private int _hoverSceneIndex = -1;
     private bool _ignoreSceneChanges = false;
     private WindowsSettingFlags _flags;
+    private Vector2 _windowContentsOffset;
+    private Rect _scenesMinMaxSize = new Rect();
 
     [MenuItem("Window/SceneManager Window")]
     private static void CreateWindow()
@@ -30,13 +34,23 @@ public sealed class SceneManagerWindow : EditorWindow
         _sceneCollection = new SceneCollection();
         _previewCollection = new ScenePreviewCollection(_sceneCollection);
 
+        titleContent = new GUIContent("Scene Man");
+
         _sceneCollection.UpdateRelativePaths();
-        //UpdateTexturePreviewCache();
 
         SceneView.onSceneGUIDelegate += OnSceneGUI;
         SceneChange.OnSceneChange += UpdateScenePreviewImage;
 
         ShowScenePreviews = true;
+
+        CalculateMinMaxSceneSizes();
+        _windowContentsOffset = _scenesMinMaxSize.center;
+    }
+
+    private void OnDisable()
+    {
+        SceneView.onSceneGUIDelegate -= OnSceneGUI;
+        SceneChange.OnSceneChange -= UpdateScenePreviewImage;
     }
 
     private void OnGUI()
@@ -44,22 +58,33 @@ public sealed class SceneManagerWindow : EditorWindow
         HandleSceneManagerAssetDrop();
 
         EditorGUILayout.BeginVertical();
-        DrawToolbar();
 
-        var lastRect = GUILayoutUtility.GetLastRect();
-        var renderArea = new Rect(0, lastRect.yMax, position.width, position.height - lastRect.yMax);
+        HandleMouseDrag();
 
         if (_asset)
-        {
-            DrawSceneMap(renderArea);
-            if (EditorApplication.isPlaying)
-                Handles.DrawWireDisc(Camera.main.transform.position + new Vector3(position.width, position.height) *.5f, -Vector3.forward, SceneManager.cBufferArea);
-        }
+            DrawSceneMap();
 
         if (ShowOptions)
-            DrawOptionsPopup(renderArea);
+            DrawOptionsPopup();
+
+        DrawToolbar();
 
         EditorGUILayout.EndVertical();
+    }
+
+    private void HandleMouseDrag()
+    {
+        var e = Event.current;
+
+        CalculateMinMaxSceneSizes();
+
+        if (e.type == EventType.mouseDrag && e.button > 0)
+        {
+            _windowContentsOffset.x = Mathf.Clamp(_windowContentsOffset.x + e.delta.x, -position.width*.5f-_scenesMinMaxSize.xMin, position.width * .5f - _scenesMinMaxSize.xMax);
+            _windowContentsOffset.y = Mathf.Clamp(_windowContentsOffset.y + e.delta.y, -position.height * .5f + _scenesMinMaxSize.yMin, position.height * .5f - _scenesMinMaxSize.yMax);
+
+            Repaint();
+        }
     }
 
     private void DrawToolbar()
@@ -97,7 +122,7 @@ public sealed class SceneManagerWindow : EditorWindow
         EditorGUILayout.EndHorizontal();
     }
 
-    private void DrawSceneMap(Rect renderArea)
+    private void DrawSceneMap()
     {
         int i;
         Rect rectWithOffset = new Rect();
@@ -180,8 +205,8 @@ public sealed class SceneManagerWindow : EditorWindow
     private Rect GetRectWithScreenOffset(Rect rect)
     {
         var result = new Rect();
-        result.x = rect.x + position.width * .5f;
-        result.y = position.height * .5f - rect.y;
+        result.x = rect.x + position.width * .5f + _windowContentsOffset.x;
+        result.y = position.height * .5f - rect.y + _windowContentsOffset.y;
         result.width  = rect.width;
         result.height = rect.height;
 
@@ -217,7 +242,41 @@ public sealed class SceneManagerWindow : EditorWindow
         Handles.color = oldCol;
     }
 
-    private void DrawOptionsPopup(Rect renderArea)
+    private void CalculateMinMaxSceneSizes()
+    {
+        if (_asset.Count == 0)
+            return;
+
+        Rect rect;
+        rect = _asset[0].rectangle;
+
+        _scenesMinMaxSize.xMin = rect.x;
+        _scenesMinMaxSize.xMax = rect.x + rect.width;
+        _scenesMinMaxSize.yMin = rect.y;
+        _scenesMinMaxSize.yMax = rect.y + rect.height;
+
+        for (int i = 1; i < _asset.Count; i++)
+        {
+            rect = _asset[i].rectangle;
+
+            //  Left
+            if (rect.xMin < _scenesMinMaxSize.xMin)
+                _scenesMinMaxSize.xMin = rect.xMin;
+            //  Right
+            if (rect.xMax > _scenesMinMaxSize.xMax)
+                _scenesMinMaxSize.xMax = rect.xMax;
+
+            //  Top
+            if (rect.yMin > _scenesMinMaxSize.yMin)
+                _scenesMinMaxSize.yMin = rect.yMin;
+            //  Bottom
+            var bot = rect.y + rect.height;
+            if (bot < _scenesMinMaxSize.yMax)
+                _scenesMinMaxSize.yMax = bot;
+        }
+    }
+
+    private void DrawOptionsPopup()
     {
         using (var scope = new EditorGUILayout.VerticalScope("Box", GUILayout.Width(350)))
         {
