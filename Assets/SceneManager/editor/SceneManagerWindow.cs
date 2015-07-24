@@ -2,6 +2,7 @@
 using UnityEditor;
 using System.Collections.Generic;
 using System.IO;
+using System;
 
 public sealed class SceneManagerWindow : EditorWindow
 {
@@ -12,11 +13,10 @@ public sealed class SceneManagerWindow : EditorWindow
     private ScenePreviewCollection _previewCollection;
     private string _scenePreviewImagesFolder;
     private Camera _windowCamera;
-    private bool _showStats;
-    private bool _showSceneNames;
-    private bool _showSurroundingScenesInSceneView;
     private int _selectedSceneIndex = -1;
     private int _hoverSceneIndex = -1;
+    private bool _ignoreSceneChanges = false;
+    private WindowsSettingFlags _flags;
 
     [MenuItem("Window/SceneManager Window")]
     private static void CreateWindow()
@@ -31,10 +31,12 @@ public sealed class SceneManagerWindow : EditorWindow
         _previewCollection = new ScenePreviewCollection(_sceneCollection);
 
         _sceneCollection.UpdateRelativePaths();
+        //UpdateTexturePreviewCache();
 
         SceneView.onSceneGUIDelegate += OnSceneGUI;
         SceneChange.OnSceneChange += UpdateScenePreviewImage;
 
+        ShowScenePreviews = true;
     }
 
     private void OnGUI()
@@ -54,10 +56,8 @@ public sealed class SceneManagerWindow : EditorWindow
                 Handles.DrawWireDisc(Camera.main.transform.position + new Vector3(position.width, position.height) *.5f, -Vector3.forward, SceneManager.cBufferArea);
         }
 
-        if (_showStats)
-        {
-            DrawStatsWindow(renderArea);
-        }
+        if (ShowOptions)
+            DrawOptionsPopup(renderArea);
 
         EditorGUILayout.EndVertical();
     }
@@ -85,7 +85,7 @@ public sealed class SceneManagerWindow : EditorWindow
             GUI.enabled = true;
             GUILayout.FlexibleSpace();
 
-            _showStats = GUILayout.Toggle(_showStats, "Stats", EditorStyles.toolbarButton, new GUILayoutOption[0]);
+            ShowOptions = GUILayout.Toggle(ShowOptions, "Options", EditorStyles.toolbarButton, new GUILayoutOption[0]);
         }
         else
         {
@@ -99,9 +99,11 @@ public sealed class SceneManagerWindow : EditorWindow
 
     private void DrawSceneMap(Rect renderArea)
     {
+        int i;
         Rect rectWithOffset = new Rect();
 
-        int i;
+        //  I chose the method of a switch with loops in each to avoid 
+        //  unnecessary Begin/EndGUI() calls
         switch (Event.current.type)
         {
             case EventType.mouseMove:
@@ -153,17 +155,16 @@ public sealed class SceneManagerWindow : EditorWindow
                     data = _asset[i];
                     rectWithOffset = GetRectWithScreenOffset(_asset[i].rectangle);
 
-                    if (Event.current.type == EventType.repaint &&
-                        !string.IsNullOrEmpty(data.name) && _previewCollection.ContainsKey(data.name))
+                    if (ShowScenePreviews && !string.IsNullOrEmpty(data.name) && _previewCollection.ContainsKey(data.name))
                     {
                         if (_previewCollection.ContainsKey(data.name))
                             GUI.DrawTexture(rectWithOffset, _previewCollection[data.name]);
                     }
 
-                    if (_showSceneNames)
+                    if (ShowSceneNames)
                         GUI.Label(rectWithOffset, string.IsNullOrEmpty(data.name) ? "<NO SCENE>" : data.name);
 
-                    DrawSceneRect(rectWithOffset, i);
+                    DrawSceneRectOutline(rectWithOffset, i);
                 }
                 Handles.EndGUI();
                 break;
@@ -187,7 +188,7 @@ public sealed class SceneManagerWindow : EditorWindow
         return result;
     }
 
-    private void DrawSceneRect(Rect rect, int index)
+    private void DrawSceneRectOutline(Rect rect, int index)
     {
         if (!_asset)
             return;
@@ -216,15 +217,16 @@ public sealed class SceneManagerWindow : EditorWindow
         Handles.color = oldCol;
     }
 
-    private void DrawStatsWindow(Rect renderArea)
+    private void DrawOptionsPopup(Rect renderArea)
     {
         using (var scope = new EditorGUILayout.VerticalScope("Box", GUILayout.Width(350)))
         {
             if (_asset)
             {
                 GUILayout.Label(string.Format("{0} : [{1} Scenes Total]", _asset.name, _asset.Count));
-                _showSceneNames = GUILayout.Toggle(_showSceneNames, "Show Scene Names");
-                _showSurroundingScenesInSceneView = GUILayout.Toggle(_showSurroundingScenesInSceneView, "Show Surrounding Scene Images in SceneView");
+                ShowSceneNames = GUILayout.Toggle(ShowSceneNames, "Show Scene Names");
+                ShowScenePreviews = GUILayout.Toggle(ShowScenePreviews, "Show Scene Previews");
+                ShowSurroundingScenesInSceneView = GUILayout.Toggle(ShowSurroundingScenesInSceneView, "Show Surrounding Scene Previews in SceneView");
             }
             else
             {
@@ -255,10 +257,15 @@ public sealed class SceneManagerWindow : EditorWindow
         if (_asset == null)
             return;
 
+        if (_ignoreSceneChanges)
+            return;
+        _ignoreSceneChanges = true;
+
         SetUpCamera();
 
+        EditorApplication.SaveCurrentSceneIfUserWantsTo();
         var startScene = EditorApplication.currentScene;
-        EditorApplication.SaveScene();
+        
         for (int i = 0; i < _sceneCollection.Count; i++)
         {
             var sceneData = _asset.TryFindScene(_sceneCollection[i]);
@@ -278,6 +285,8 @@ public sealed class SceneManagerWindow : EditorWindow
         Resources.UnloadUnusedAssets();
         if (EditorApplication.currentScene != startScene)
             EditorApplication.OpenScene(startScene);
+
+        _ignoreSceneChanges = false;
         Repaint();
     }
 
@@ -346,36 +355,39 @@ public sealed class SceneManagerWindow : EditorWindow
 
     private void OnSceneGUI(SceneView sceneview)
     {
+        Rect rect = new Rect();
+        var oldCol = Handles.color;
         var data = _asset.TryFindScene(Path.GetFileNameWithoutExtension(EditorApplication.currentScene));
         if (data == null)
         {
             Handles.BeginGUI();
             GUILayout.Box("Scene wasn't found in the SceneManagerAsset. Cannot display boundaries.");
             Handles.EndGUI();
-
-            return;
         }
-
-        var rect = data.rectangle;
-        var center = rect.center;
-        var oldCol = Handles.color;
-        var verts = new[]
+        else
         {
+            rect = data.rectangle;
+ 
+            var verts = new[]
+            {
             new Vector2(rect.x, rect.y),
             new Vector2(rect.x + rect.width, rect.y),
             new Vector2(rect.x + rect.width, rect.y - rect.height),
             new Vector2(rect.x, rect.y - rect.height)
         };
 
-        Handles.color = Color.red;
-        Handles.DrawDottedLine(verts[0], verts[1], 5.0f);
-        Handles.DrawDottedLine(verts[1], verts[2], 5.0f);
-        Handles.DrawDottedLine(verts[2], verts[3], 5.0f);
-        Handles.DrawDottedLine(verts[3], verts[0], 5.0f);
+            Handles.color = Color.red;
+            Handles.DrawDottedLine(verts[0], verts[1], 5.0f);
+            Handles.DrawDottedLine(verts[1], verts[2], 5.0f);
+            Handles.DrawDottedLine(verts[2], verts[3], 5.0f);
+            Handles.DrawDottedLine(verts[3], verts[0], 5.0f);
+        }
 
-        if (_showSurroundingScenesInSceneView)
+
+        if (ShowSurroundingScenesInSceneView)
         {
             Handles.BeginGUI();
+
             GUI.color = Color.white * .75f;
             for (int i = 0; i < _asset.Count; i++)
             {
@@ -401,5 +413,62 @@ public sealed class SceneManagerWindow : EditorWindow
         }
         
         Handles.color = oldCol;
+    }
+
+    [Flags]
+    private enum WindowsSettingFlags
+    {
+        ShowOptions = 1,
+        ShowSceneNames = 2,
+        ShowScenePreviews = 4,
+        ShowSurroundingScenesInSceneView = 8,
+    }
+
+    private bool ShowOptions
+    {
+        get { return (_flags & WindowsSettingFlags.ShowOptions) != 0; }
+        set
+        {
+            if (value)
+                _flags |= WindowsSettingFlags.ShowOptions;
+            else
+                _flags &= ~WindowsSettingFlags.ShowOptions;
+        }
+    }
+
+    private bool ShowSceneNames
+    {
+        get { return (_flags & WindowsSettingFlags.ShowSceneNames) != 0; }
+        set
+        {
+            if (value)
+                _flags |= WindowsSettingFlags.ShowSceneNames;
+            else
+                _flags &= ~WindowsSettingFlags.ShowSceneNames;
+        }
+    }
+
+    private bool ShowScenePreviews
+    {
+        get { return (_flags & WindowsSettingFlags.ShowScenePreviews) != 0; }
+        set
+        {
+            if (value)
+                _flags |= WindowsSettingFlags.ShowScenePreviews;
+            else
+                _flags &= ~WindowsSettingFlags.ShowScenePreviews;
+        }
+    }
+
+    private bool ShowSurroundingScenesInSceneView
+    {
+        get { return (_flags & WindowsSettingFlags.ShowSurroundingScenesInSceneView) != 0; }
+        set
+        {
+            if (value)
+                _flags |= WindowsSettingFlags.ShowSurroundingScenesInSceneView;
+            else
+                _flags &= ~WindowsSettingFlags.ShowSurroundingScenesInSceneView;
+        }
     }
 }
