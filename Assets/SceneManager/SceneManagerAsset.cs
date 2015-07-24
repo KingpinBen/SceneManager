@@ -28,16 +28,29 @@ public sealed class SceneManagerAsset : ScriptableObject
 
     public SceneData TryFindScene(string name)
     {
-        if (string.IsNullOrEmpty(name))
-            return null;
-
-        for(int i = 0; i < _sceneData.Length; i++)
-        {
-            if (_sceneData[i].name == name)
-                return _sceneData[i];
-        }
+        int index;
+        if (TryFindSceneIndex(name, out index))
+            return _sceneData[index];
 
         return null;
+    }
+
+    public bool TryFindSceneIndex(string name, out int index)
+    {
+        index = -1;
+        if (string.IsNullOrEmpty(name))
+            return false;
+
+        for (int i = 0; i < _sceneData.Length; i++)
+        {
+            if (_sceneData[i].name == name)
+            {
+                index = i;
+                return true;
+            }
+        }
+
+        return false;
     }
 
 #if UNITY_EDITOR
@@ -62,4 +75,9 @@ public class SceneData
 {
     public string name;
     public Rect rectangle;
+
+    public Vector2 alteredCenter
+    {
+        get { return new Vector2(rectangle.center.x, rectangle.y - rectangle.height * .5f); }
+    }
 }
