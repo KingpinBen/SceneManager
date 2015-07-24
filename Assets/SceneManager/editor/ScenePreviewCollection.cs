@@ -7,7 +7,6 @@ using System.IO;
 public sealed class ScenePreviewCollection
 {
     private Dictionary<string, Texture2D> _texturePreviewCache;
-    private SceneCollection _sceneCollection;
     private string _previewFolder;
 
     private const string cSceneImagesPreviewFolderName = "Scene Previews";
@@ -15,7 +14,6 @@ public sealed class ScenePreviewCollection
     public ScenePreviewCollection(SceneCollection sceneCollection)
     {
         _texturePreviewCache = new Dictionary<string, Texture2D>();
-        _sceneCollection = sceneCollection;
 
         FindPreviewFolder();
     }
