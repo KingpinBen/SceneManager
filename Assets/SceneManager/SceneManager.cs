@@ -9,14 +9,29 @@ public sealed class SceneManager : MonoBehaviour
     private Dictionary<int, GameObject> _sceneBaseObjects;
     private HashSet<int> _activeScenes;
     private float _sqrBufferArea;
+    private float _sqrActiveArea;
 
-    public const float cBufferArea = 50.0f;
+    public const float cBufferArea = 80.0f;
+    public const float cActiveArea = 40.0f;
 
     private void Awake()
     {
-        _sceneBaseObjects = new Dictionary<int, GameObject>();
-        _activeScenes = new HashSet<int>();
-        _sqrBufferArea = Mathf.Pow(cBufferArea, 2);
+        if (_instance)
+        {
+            Destroy(gameObject);
+        }
+        else
+        {
+            DontDestroyOnLoad(this);
+
+            _sceneBaseObjects = new Dictionary<int, GameObject>();
+            _activeScenes = new HashSet<int>();
+
+            _sqrBufferArea = Mathf.Pow(cBufferArea, 2);
+            _sqrActiveArea = Mathf.Pow(cActiveArea, 2);
+
+            _instance = this;
+        }
     }
 
     private void Start()
@@ -39,7 +54,6 @@ public sealed class SceneManager : MonoBehaviour
 #else
         Application.LoadLevelAdditive(_sceneManagerAsset[index].name);
 #endif
-
         _activeScenes.Add(index);
     }
 
@@ -53,15 +67,17 @@ public sealed class SceneManager : MonoBehaviour
             _sceneBaseObjects.Remove(sceneIndexInAsset);
             _activeScenes.Remove(sceneIndexInAsset);
         }
-        else
-        {
-            throw new UnityException("SCENEMANAGER::UNLOADSCENE::SCENE_ISNT_LOADED");
-        }
     }
 
-    public int ActiveSceneCount
+    public void RegisterSceneObject(ManagedSceneObject obj)
     {
-        get { return _activeScenes.Count; }
+        if (obj == null)
+            return;
+        int index;
+        if (!_sceneManagerAsset.TryFindSceneIndex(obj.sceneName, out index))
+            throw new UnityException("SCENEMANAGER::REGISTERSCENEOBJECT::SCENEMANAGERASSET_DOESNT_CONTAIN_VALUE");
+
+        _sceneBaseObjects[index] = obj.gameObject;
     }
 
     private IEnumerator CalculateScenesStatesPeriodically()
@@ -83,17 +99,70 @@ public sealed class SceneManager : MonoBehaviour
     private void CheckSceneState(ref int index, ref Vector2 trackedObjectPos)
     {
         var data = _sceneManagerAsset[index];
-        var sqrRadius = Mathf.Pow(Mathf.Max(data.rectangle.width, data.rectangle.height) * .5f, 2);
+        var closestPoint = ClosestPointToRect(ref data.rectangle, ref trackedObjectPos);
 
         if (_activeScenes.Contains(index))
         {
-            if ((data.rectangle.center - trackedObjectPos).sqrMagnitude > sqrRadius + _sqrBufferArea)
-                UnloadScene(index);
+            //  Scene hasn't yet fully registered.
+            if (!_sceneBaseObjects.ContainsKey(index))
+                return;
+
+            if (_sceneBaseObjects[index].activeSelf)
+            {
+                if ((closestPoint - trackedObjectPos).sqrMagnitude > _sqrActiveArea)
+                    _sceneBaseObjects[index].SetActive(false);
+            }
+            else
+            {
+                if ((closestPoint - trackedObjectPos).sqrMagnitude < _sqrActiveArea)
+                {
+                    _sceneBaseObjects[index].SetActive(true);
+                }
+                else
+                {
+                    if ((closestPoint - trackedObjectPos).sqrMagnitude > _sqrBufferArea)
+                        UnloadScene(index);
+                }
+            }
         }
         else
         {
-            if ((data.rectangle.center - trackedObjectPos).sqrMagnitude < sqrRadius + _sqrBufferArea)
+            if ((closestPoint - trackedObjectPos).sqrMagnitude < _sqrBufferArea)
                 LoadScene(index);
+        }
+    }
+
+    private Vector2 ClosestPointToRect(ref Rect rect, ref Vector2 from)
+    {
+        return new Vector2(Mathf.Clamp(from.x, rect.x, rect.x + rect.width), Mathf.Clamp(from.y, rect.y - rect.height, rect.y));
+    }
+
+    private Vector2 ClosestPointToRect(ref Rect rect, Vector2 from)
+    {
+        return ClosestPointToRect(ref rect, ref from);
+    }
+
+    private void OnDrawGizmos()
+    {
+        for(int i = 0; i < _sceneManagerAsset.Count; i++)
+        {
+            Gizmos.DrawLine(targetPositionAsVec2, ClosestPointToRect(ref _sceneManagerAsset[i].rectangle, targetPositionAsVec2));
+            Gizmos.DrawWireCube(_sceneManagerAsset[i].alteredCenter, new Vector3(_sceneManagerAsset[i].rectangle.width, _sceneManagerAsset[i].rectangle.height));
+        }
+    }
+
+    public int ActiveSceneCount
+    {
+        get { return _activeScenes.Count; }
+    }
+
+    private static SceneManager _instance;
+    public static SceneManager instance
+    {
+        get { return _instance; }
+        private set
+        {
+            _instance = value;
         }
     }
 
