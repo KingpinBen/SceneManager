@@ -5,3 +5,6 @@ A small tool I wanted to make in a few days just to make something new for GitHu
 
 23/07 (first upload):
   The Assets included allow the user to start creating and stitching together separate scenes using a SceneManagerAsset
+
+Video:
+ (1)https://youtu.be/S3EJPnUoHWs
