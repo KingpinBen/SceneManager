@@ -55,9 +55,21 @@ public sealed class SceneManagerAsset : ScriptableObject
 
 #if UNITY_EDITOR
 
+    [MenuItem("SceneManager/Create Scene Collection Asset")]
+    public static void CreateSceneManagerAsset()
+    {
+        var asset = CreateInstance<SceneManagerAsset>();
+        var pathAndName = AssetDatabase.GenerateUniqueAssetPath(string.Format("Assets/New {0}.asset", typeof(SceneManagerAsset).ToString()));
+        AssetDatabase.CreateAsset(asset, pathAndName);
+        AssetDatabase.SaveAssets();
+        AssetDatabase.Refresh();
+
+        EditorUtility.FocusProjectWindow();
+        Selection.activeObject = asset;
+    }
+
     public int AddNewSceneData()
     {
-        
         var defaultDimensions = new Vector2(100, 50);
         var index = _sceneData.Length;
         var newData = new SceneData();
@@ -66,6 +78,16 @@ public sealed class SceneManagerAsset : ScriptableObject
 
         ArrayUtility.Add(ref _sceneData, newData);
         return index;
+    }
+
+    public void RemoveAt(int index)
+    {
+        ArrayUtility.RemoveAt(ref _sceneData, index);
+    }
+
+    public IEnumerator<SceneData> GetEnumerator()
+    {
+        return ((IEnumerable<SceneData>)_sceneData).GetEnumerator();
     }
 #endif
 }
