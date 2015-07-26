@@ -10,8 +10,8 @@ public class SceneManagerAssetEditor : Editor
 
     private static HashSet<string> _shownScenes;
     private static GUIContent _deleteSceneButtonContent = EditorGUIUtility.IconContent("TreeEditor.Trash");
-    private static GUIContent s_missingSceneNameContent =
-        new GUIContent("NoName", EditorGUIUtility.IconContent("console.warnicon").image);
+    public static readonly GUIContent cMissingSceneNameContent =
+        new GUIContent("No Scene", EditorGUIUtility.IconContent("console.warnicon").image);
 
 
     private void OnEnable()
@@ -30,8 +30,17 @@ public class SceneManagerAssetEditor : Editor
             DrawSceneData(i++);
         }
 
-        if (GUILayout.Button("Add New SceneData"))
+        GUILayout.BeginHorizontal();
+        if (GUILayout.Button("Add New SceneData", EditorStyles.miniButtonLeft))
             AddNewSceneData();
+
+        if (GUILayout.Button("Open Window", EditorStyles.miniButtonRight))
+        {
+            EditorWindow.GetWindow<SceneManagerWindow>().Show();
+
+        }
+
+        GUILayout.EndHorizontal();
     }
 
     private void AddNewSceneData()
@@ -53,13 +62,13 @@ public class SceneManagerAssetEditor : Editor
         EditorGUI.indentLevel++;
 
         if (string.IsNullOrEmpty(sceneData.name))
-            shown = EditorGUILayout.Foldout(shown, s_missingSceneNameContent);
+            shown = Foldout(shown, cMissingSceneNameContent, true);
         else
-            shown = EditorGUILayout.Foldout(shown, sceneData.name);
+            shown = Foldout(shown, sceneData.name, true);
 
         EditorGUI.indentLevel--;
-        GUILayout.FlexibleSpace();
-        if (GUILayout.Button(_deleteSceneButtonContent, EditorStyles.toolbarButton) &&
+
+        if (GUILayout.Button(_deleteSceneButtonContent, EditorStyles.toolbarButton, GUILayout.Width(30)) &&
             EditorUtility.DisplayDialog("You are about to remove a tracked scene", string.Format("Are you sure you want to remove the scene '{0} from the list?", sceneData.name), "Yes", "Cancel"))
         {
             _target.RemoveAt(index);
@@ -112,5 +121,24 @@ public class SceneManagerAssetEditor : Editor
                 SceneManagerWindow.instance.Repaint();
             }
         }
+    }
+
+    public static bool Foldout(bool foldout, GUIContent content, bool toggleOnLabelClick, GUIStyle style)
+    {
+        var position = GUILayoutUtility.GetRect(40f, 40f, 16f, 16f, style);
+        // EditorGUI.kNumberW == 40f but is internal
+        return EditorGUI.Foldout(position, foldout, content, toggleOnLabelClick, style);
+    }
+    public static bool Foldout(bool foldout, string content, bool toggleOnLabelClick, GUIStyle style)
+    {
+        return Foldout(foldout, new GUIContent(content), toggleOnLabelClick, style);
+    }
+    public static bool Foldout(bool foldout, string content, bool toggleOnLabelClick)
+    {
+        return Foldout(foldout, new GUIContent(content), toggleOnLabelClick, EditorStyles.foldout);
+    }
+    public static bool Foldout(bool foldout, GUIContent content, bool toggleOnLabelClick)
+    {
+        return Foldout(foldout, content, toggleOnLabelClick, EditorStyles.foldout);
     }
 }
