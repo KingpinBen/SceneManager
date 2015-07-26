@@ -11,7 +11,7 @@ public class SceneManagerAssetEditor : Editor
     private static HashSet<string> _shownScenes;
     private static GUIContent _deleteSceneButtonContent = EditorGUIUtility.IconContent("TreeEditor.Trash");
     private static GUIContent s_missingSceneNameContent =
-    new GUIContent("NoName", EditorGUIUtility.IconContent("console.warnicon").image);
+        new GUIContent("NoName", EditorGUIUtility.IconContent("console.warnicon").image);
 
 
     private void OnEnable()
@@ -39,7 +39,6 @@ public class SceneManagerAssetEditor : Editor
         int index = _target.AddNewSceneData();
 
         _target[index].name = null;
-        _target[index].rectangle = new Rect(0, 0, 100, 75);
 
         if (SceneManagerWindow.instance)
             SceneManagerWindow.instance.Repaint();
@@ -83,25 +82,25 @@ public class SceneManagerAssetEditor : Editor
             EditorGUILayout.BeginVertical();
             sceneData.name = EditorGUILayout.TextField("Scene Name", sceneData.name);
 
-            var vec = new Vector2(sceneData.rectangle.x, sceneData.rectangle.y);
+            var vec = new Vector2(sceneData.x, sceneData.y);
             vec = EditorGUILayout.Vector2Field("Position", vec);
 
-            dirty = dirty || (vec.x != sceneData.rectangle.x || vec.y != sceneData.rectangle.y);
+            dirty = dirty || (vec.x != sceneData.x || vec.y != sceneData.y);
 
-            sceneData.rectangle.x = vec.x;
-            sceneData.rectangle.y = vec.y;
+            sceneData.x = (int)vec.x;
+            sceneData.y = (int)vec.y;
 
-            vec.x = sceneData.rectangle.width;
-            vec.y = sceneData.rectangle.height;
+            vec.x = sceneData.width;
+            vec.y = sceneData.height;
             vec = EditorGUILayout.Vector2Field("Size", vec);
 
             vec.x = Mathf.Clamp(vec.x, 10, vec.x);
             vec.y = Mathf.Clamp(vec.y, 10, vec.y);
 
-            dirty = dirty || (vec.x != sceneData.rectangle.width || vec.y != sceneData.rectangle.height);
+            dirty = dirty || (vec.x != sceneData.width || vec.y != sceneData.height);
 
-            sceneData.rectangle.width = vec.x;
-            sceneData.rectangle.height = vec.y;
+            sceneData.width = vec.x;
+            sceneData.height = vec.y;
 
             EditorGUILayout.EndVertical();
             EditorGUI.indentLevel--;

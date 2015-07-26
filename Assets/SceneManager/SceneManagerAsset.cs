@@ -70,11 +70,8 @@ public sealed class SceneManagerAsset : ScriptableObject
 
     public int AddNewSceneData()
     {
-        var defaultDimensions = new Vector2(100, 50);
         var index = _sceneData.Length;
         var newData = new SceneData();
-
-        newData.rectangle = new Rect(-defaultDimensions.x * .5f, -defaultDimensions.y * .5f, defaultDimensions.x, defaultDimensions.y);
 
         ArrayUtility.Add(ref _sceneData, newData);
         return index;
@@ -84,11 +81,6 @@ public sealed class SceneManagerAsset : ScriptableObject
     {
         ArrayUtility.RemoveAt(ref _sceneData, index);
     }
-
-    public IEnumerator<SceneData> GetEnumerator()
-    {
-        return ((IEnumerable<SceneData>)_sceneData).GetEnumerator();
-    }
 #endif
 }
 
@@ -96,10 +88,57 @@ public sealed class SceneManagerAsset : ScriptableObject
 public class SceneData
 {
     public string name;
-    public Rect rectangle;
+    [SerializeField]
+    private Rect _rectangle;
+
+    public SceneData()
+    {
+        _rectangle = new Rect(0, 0, 20, 20);
+    }
 
     public Vector2 alteredCenter
     {
-        get { return new Vector2(rectangle.center.x, rectangle.y - rectangle.height * .5f); }
+        get { return new Vector2(_rectangle.center.x, _rectangle.y - _rectangle.height * .5f); }
+    }
+
+    public int x
+    {
+        get { return (int)_rectangle.x; }
+        set { _rectangle.x = value; }
+    }
+
+    public int xMax
+    {
+        get { return (int)_rectangle.xMax; }
+        set { _rectangle.xMax = value; }
+    }
+
+    public int y
+    {
+        get { return (int)_rectangle.y; }
+        set { _rectangle.y = value; }
+    }
+
+    public int yMax
+    {
+        get { return (int)_rectangle.yMax; }
+        set { _rectangle.yMax = value; }
+    }
+
+    public float width
+    {
+        get { return _rectangle.width; }
+        set { _rectangle.width = Mathf.Max((int)value, 10); }
+    }
+
+    public float height
+    {
+        get { return _rectangle.height; }
+        set { _rectangle.height = Mathf.Max((int)value, 10); }
+    }
+
+    public Rect rectangle
+    {
+        get { return _rectangle; }
     }
 }
