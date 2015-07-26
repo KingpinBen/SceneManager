@@ -112,8 +112,7 @@ public sealed class SceneManagerWindow : EditorWindow
             {
                 _asset.AddNewSceneData();
 
-                EditorGUIUtility.PingObject(_asset);
-                Selection.activeObject = _asset;
+                _selectedSceneIndex = _asset.Count - 1;
 
                 EditorUtility.SetDirty(_asset);
             }
@@ -121,6 +120,12 @@ public sealed class SceneManagerWindow : EditorWindow
             if (GUILayout.Button("Update Previews", EditorStyles.toolbarButton, new GUILayoutOption[0]))
             {
                 UpdateTexturePreviewCache();
+            }
+
+            if (GUILayout.Button("Focus Active Asset", EditorStyles.toolbarButton, new GUILayoutOption[0]))
+            {
+                Selection.activeObject = _asset;
+                EditorUtility.FocusProjectWindow();
             }
             GUI.enabled = true;
             GUILayout.FlexibleSpace();
@@ -230,6 +235,12 @@ public sealed class SceneManagerWindow : EditorWindow
 
         HandleResizeDraggingScene();
 
+        if (Event.current.type == EventType.repaint || Event.current.type == EventType.layout)
+        {
+            if (ShowSelectedSceneInfo)
+                DrawSceneInfoPopup();
+        }
+
         switch (Event.current.type)
         {
             case EventType.mouseUp:
@@ -308,6 +319,7 @@ public sealed class SceneManagerWindow : EditorWindow
                 }
 
                 Handles.DrawSolidRectangleWithOutline(_vertexCache, Color.cyan * .7f, Color.clear);
+
                 break;
         }
     }
@@ -465,12 +477,40 @@ public sealed class SceneManagerWindow : EditorWindow
                 ShowSceneNames = GUILayout.Toggle(ShowSceneNames, "Show Scene Names");
                 ShowScenePreviews = GUILayout.Toggle(ShowScenePreviews, "Show Scene Previews");
                 ShowSurroundingScenesInSceneView = GUILayout.Toggle(ShowSurroundingScenesInSceneView, "Show Surrounding Scene Previews in SceneView");
+                ShowSelectedSceneInfo = GUILayout.Toggle(ShowSelectedSceneInfo, "Show Selected Scene Info Popup");
+
             }
             else
             {
                 GUILayout.Label("No asset assigned. Drag one onto the window");
             }
         }
+    }
+
+    private void DrawSceneInfoPopup()
+    {
+        const float width = 120;
+        const float height = 20 * 3;
+        const float sideOffset = 2.0f;
+
+        var data = _asset[_selectedSceneIndex];
+
+        GUILayout.BeginArea(new Rect(position.width - width - sideOffset, position.height - height - sideOffset, width, height), GUIContent.none, "Box");
+        GUILayout.Label(string.IsNullOrEmpty(data.name) ? SceneManagerAssetEditor.cMissingSceneNameContent : new GUIContent(data.name));
+
+        GUILayout.BeginHorizontal();
+        GUILayout.Label("Position");
+        GUILayout.FlexibleSpace();
+        GUILayout.Label(string.Format("[{0}, {1}]", data.x, data.y));
+        GUILayout.EndHorizontal();
+        
+        GUILayout.BeginHorizontal();
+        GUILayout.Label("Size");
+        GUILayout.FlexibleSpace();
+        GUILayout.Label(string.Format("[{0}, {1}]", data.width, data.height));
+        GUILayout.EndHorizontal();
+
+        GUILayout.EndArea();
     }
 
     private void SetUpCamera()
@@ -716,6 +756,18 @@ public sealed class SceneManagerWindow : EditorWindow
         }
     }
 
+    private bool ShowSelectedSceneInfo
+    {
+        get { return (_flags & WindowsSettingFlags.ShowSelectedSceneInfo) != 0; }
+        set
+        {
+            if (value)
+                _flags |= WindowsSettingFlags.ShowSelectedSceneInfo;
+            else
+                _flags &= ~WindowsSettingFlags.ShowSelectedSceneInfo;
+        }
+    }
+
     public static SceneManagerWindow instance
     {
         get { return s_window; }
@@ -728,6 +780,7 @@ public sealed class SceneManagerWindow : EditorWindow
         ShowSceneNames = 2,
         ShowScenePreviews = 4,
         ShowSurroundingScenesInSceneView = 8,
+        ShowSelectedSceneInfo = 16,
     }
 
     private enum DraggingEdge
