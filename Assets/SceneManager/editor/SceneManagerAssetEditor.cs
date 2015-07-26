@@ -8,7 +8,7 @@ public class SceneManagerAssetEditor : Editor
 {
     private SceneManagerAsset _target;
 
-    private static HashSet<string> _hiddenScenes;
+    private static HashSet<string> _shownScenes;
     private static GUIContent _deleteSceneButtonContent = EditorGUIUtility.IconContent("TreeEditor.Trash");
     private static GUIContent s_missingSceneNameContent =
     new GUIContent("NoName", EditorGUIUtility.IconContent("console.warnicon").image);
@@ -18,8 +18,8 @@ public class SceneManagerAssetEditor : Editor
     {
         _target = target as SceneManagerAsset;
 
-        if (_hiddenScenes == null)
-            _hiddenScenes = new HashSet<string>();
+        if (_shownScenes == null)
+            _shownScenes = new HashSet<string>();
     }
 
     public override void OnInspectorGUI()
@@ -48,7 +48,7 @@ public class SceneManagerAssetEditor : Editor
     private void DrawSceneData(int index)
     {
         var sceneData = _target[index];
-        var shown = !_hiddenScenes.Contains(sceneData.name);
+        var shown = _shownScenes.Contains(sceneData.name);
 
         EditorGUILayout.BeginHorizontal("toolbar");
         EditorGUI.indentLevel++;
@@ -73,8 +73,8 @@ public class SceneManagerAssetEditor : Editor
 
         if (!shown)
         {
-            if (!_hiddenScenes.Contains(sceneData.name))
-                _hiddenScenes.Add(sceneData.name);
+            if (_shownScenes.Contains(sceneData.name))
+                _shownScenes.Remove(sceneData.name);
         }
         else
         {
@@ -105,8 +105,8 @@ public class SceneManagerAssetEditor : Editor
 
             EditorGUILayout.EndVertical();
             EditorGUI.indentLevel--;
-            if (_hiddenScenes.Contains(sceneData.name))
-                _hiddenScenes.Remove(sceneData.name);
+            if (!_shownScenes.Contains(sceneData.name))
+                _shownScenes.Add(sceneData.name);
 
             if (dirty && SceneManagerWindow.instance)
             {
