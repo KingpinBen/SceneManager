@@ -95,6 +95,9 @@ public class SceneManagerAssetEditor : Editor
             vec.y = sceneData.rectangle.height;
             vec = EditorGUILayout.Vector2Field("Size", vec);
 
+            vec.x = Mathf.Clamp(vec.x, 10, vec.x);
+            vec.y = Mathf.Clamp(vec.y, 10, vec.y);
+
             dirty = dirty || (vec.x != sceneData.rectangle.width || vec.y != sceneData.rectangle.height);
 
             sceneData.rectangle.width = vec.x;
