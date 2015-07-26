@@ -47,6 +47,9 @@ public sealed class SceneManagerWindow : EditorWindow
 
         CalculateMinMaxSceneSizes();
         _windowContentsOffset = _scenesMinMaxSize.center;
+
+        if (!s_window)
+            s_window = this;
     }
 
     private void OnDisable()
@@ -179,6 +182,11 @@ public sealed class SceneManagerWindow : EditorWindow
                 }
                 break;
             case EventType.repaint:
+
+                if (_hoverSceneIndex >= _asset.Count)
+                    _hoverSceneIndex = -1;
+                if (_selectedSceneIndex >= _asset.Count)
+                    _selectedSceneIndex = -1;
 
                 Handles.BeginGUI();
 
@@ -462,11 +470,17 @@ public sealed class SceneManagerWindow : EditorWindow
             new Vector2(rect.x, rect.y - rect.height)
         };
 
+            Handles.DrawLine(verts[0], verts[1]);
+            Handles.DrawLine(verts[1], verts[2]);
+            Handles.DrawLine(verts[2], verts[3]);
+            Handles.DrawLine(verts[3], verts[0]);
+
             Handles.color = Color.red;
-            Handles.DrawDottedLine(verts[0], verts[1], 5.0f);
-            Handles.DrawDottedLine(verts[1], verts[2], 5.0f);
-            Handles.DrawDottedLine(verts[2], verts[3], 5.0f);
-            Handles.DrawDottedLine(verts[3], verts[0], 5.0f);
+            
+            Handles.DrawDottedLine(verts[0], verts[1], 3.0f);
+            Handles.DrawDottedLine(verts[1], verts[2], 3.0f);
+            Handles.DrawDottedLine(verts[2], verts[3], 3.0f);
+            Handles.DrawDottedLine(verts[3], verts[0], 3.0f);
         }
 
 
