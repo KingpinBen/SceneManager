@@ -7,7 +7,6 @@ using System.Collections.Generic;
 public class SceneManagerAssetEditor : Editor
 {
     private SceneManagerAsset _target;
-    //private SerializedProperty _sceneData;
 
     private static HashSet<string> _hiddenScenes;
     private static GUIContent _deleteSceneButtonContent = EditorGUIUtility.IconContent("TreeEditor.Trash");
@@ -65,6 +64,7 @@ public class SceneManagerAssetEditor : Editor
             EditorUtility.DisplayDialog("You are about to remove a tracked scene", string.Format("Are you sure you want to remove the scene '{0} from the list?", sceneData.name), "Yes", "Cancel"))
         {
             _target.RemoveAt(index);
+
             if (SceneManagerWindow.instance)
                 SceneManagerWindow.instance.Repaint();
             return;
@@ -78,18 +78,25 @@ public class SceneManagerAssetEditor : Editor
         }
         else
         {
+            bool dirty = false;
             EditorGUI.indentLevel++;
             EditorGUILayout.BeginVertical();
             sceneData.name = EditorGUILayout.TextField("Scene Name", sceneData.name);
 
             var vec = new Vector2(sceneData.rectangle.x, sceneData.rectangle.y);
             vec = EditorGUILayout.Vector2Field("Position", vec);
+
+            dirty = dirty || (vec.x != sceneData.rectangle.x || vec.y != sceneData.rectangle.y);
+
             sceneData.rectangle.x = vec.x;
             sceneData.rectangle.y = vec.y;
 
             vec.x = sceneData.rectangle.width;
             vec.y = sceneData.rectangle.height;
             vec = EditorGUILayout.Vector2Field("Size", vec);
+
+            dirty = dirty || (vec.x != sceneData.rectangle.width || vec.y != sceneData.rectangle.height);
+
             sceneData.rectangle.width = vec.x;
             sceneData.rectangle.height = vec.y;
 
@@ -98,8 +105,10 @@ public class SceneManagerAssetEditor : Editor
             if (_hiddenScenes.Contains(sceneData.name))
                 _hiddenScenes.Remove(sceneData.name);
 
-            if (SceneManagerWindow.instance)
+            if (dirty && SceneManagerWindow.instance)
+            {
                 SceneManagerWindow.instance.Repaint();
+            }
         }
     }
 }
