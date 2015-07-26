@@ -103,7 +103,7 @@ public sealed class SceneManager : MonoBehaviour
     private void CheckSceneState(ref int index, ref Vector2 trackedObjectPos)
     {
         var data = _sceneManagerAsset[index];
-        var closestPoint = ClosestPointToRect(ref data.rectangle, ref trackedObjectPos);
+        var closestPoint = data.rectangle.ClosestPoint(trackedObjectPos);
 
         if (_activeScenes.Contains(index))
         {
@@ -142,25 +142,15 @@ public sealed class SceneManager : MonoBehaviour
         }
     }
 
-    private Vector2 ClosestPointToRect(ref Rect rect, ref Vector2 from)
-    {
-        return new Vector2(Mathf.Clamp(from.x, rect.x, rect.x + rect.width), Mathf.Clamp(from.y, rect.y - rect.height, rect.y));
-    }
-
-    private Vector2 ClosestPointToRect(ref Rect rect, Vector2 from)
-    {
-        return ClosestPointToRect(ref rect, ref from);
-    }
-
     public bool TryTransferTraversable(Renderer traversableRenderer)
     {
         for(int i = 0; i <_activeScenes.Count; i++)
         {
             Debug.Log(string.Format("{0}, {1} | {2}, {3}",
-                _sceneManagerAsset[i].rectangle.x,
-                _sceneManagerAsset[i].rectangle.y,
-                _sceneManagerAsset[i].rectangle.xMax,
-                _sceneManagerAsset[i].rectangle.yMax));
+                _sceneManagerAsset[i].x,
+                _sceneManagerAsset[i].y,
+                _sceneManagerAsset[i].xMax,
+                _sceneManagerAsset[i].yMax));
 
             if (_sceneManagerAsset[i].rectangle.Contains(traversableRenderer.bounds))
             {

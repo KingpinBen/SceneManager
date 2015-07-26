@@ -70,25 +70,3 @@ public class ManagedSceneObject : MonoBehaviour
     }
 #endif
 }
-
-public static partial class Extensions
-{
-    public static bool Contains(this Rect rect, Bounds bounds)
-    {
-        //  Bottom left is bounds.min
-        //  Top right is bounds.max
-
-        //  Bounds left < rect.right
-        //  Bounds right > rect.left
-        //  Bounds top > rect.bottom
-        //  Bounds bottom < rect.top
-
-        if (bounds.min.x < rect.xMax &&
-            bounds.max.x > rect.x &&
-            bounds.max.y > rect.y - rect.height &&
-            bounds.min.y < rect.y)
-            return true;
-
-        return false;
-    }
-}
