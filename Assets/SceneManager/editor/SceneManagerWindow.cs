@@ -22,11 +22,13 @@ public sealed class SceneManagerWindow : EditorWindow
     private Vector2 _windowContentsOffset;
     private Rect _scenesMinMaxSize = new Rect();
 
-    [MenuItem("Window/SceneManager Window")]
+    private static SceneManagerWindow s_window;
+
+    [MenuItem("SceneManager/Scene Map Window")]
     private static void CreateWindow()
     {
-        var window = CreateInstance<SceneManagerWindow>();
-        window.Show();
+        s_window = GetWindow<SceneManagerWindow>();
+        s_window.Show();
     }
 
     private void OnEnable()
@@ -34,7 +36,7 @@ public sealed class SceneManagerWindow : EditorWindow
         _sceneCollection = new SceneCollection();
         _previewCollection = new ScenePreviewCollection(_sceneCollection);
 
-        titleContent = new GUIContent("Scene Man");
+        titleContent = new GUIContent("Scene Map");
 
         _sceneCollection.UpdateRelativePaths();
 
@@ -62,7 +64,7 @@ public sealed class SceneManagerWindow : EditorWindow
         HandleMouseDrag();
 
         if (_asset)
-            DrawSceneMap();
+            DrawMap();
 
         if (ShowOptions)
             DrawOptionsPopup();
@@ -122,7 +124,7 @@ public sealed class SceneManagerWindow : EditorWindow
         EditorGUILayout.EndHorizontal();
     }
 
-    private void DrawSceneMap()
+    private void DrawMap()
     {
         int i;
         Rect rectWithOffset = new Rect();
@@ -168,33 +170,59 @@ public sealed class SceneManagerWindow : EditorWindow
                                     EditorApplication.OpenScene(_sceneCollection.GetRelativeScenePath(_asset[i].name));
                                 }
                             }
+                            else
+                            {
+                                Repaint();
+                            }
                         }
                     }
                 }
                 break;
             case EventType.repaint:
-                SceneData data = null;
+
                 Handles.BeginGUI();
+
                 for (i = 0; i < _asset.Count; i++)
                 {
-                    data = _asset[i];
-                    rectWithOffset = GetRectWithScreenOffset(_asset[i].rectangle);
+                    if (i == _selectedSceneIndex ||
+                        i == _hoverSceneIndex)
+                        continue;
 
-                    if (ShowScenePreviews && !string.IsNullOrEmpty(data.name) && _previewCollection.ContainsKey(data.name))
-                    {
-                        if (_previewCollection.ContainsKey(data.name))
-                            GUI.DrawTexture(rectWithOffset, _previewCollection[data.name]);
-                    }
-
-                    if (ShowSceneNames)
-                        GUI.Label(rectWithOffset, string.IsNullOrEmpty(data.name) ? "<NO SCENE>" : data.name);
-
-                    DrawSceneRectOutline(rectWithOffset, i);
+                    DrawScene(_asset[i], Color.white);
                 }
+
+                if (_hoverSceneIndex >= 0)
+                    DrawScene(_asset[_hoverSceneIndex], Color.yellow);
+
+                if (_selectedSceneIndex >= 0)
+                    DrawScene(_asset[_selectedSceneIndex], Color.red);
+
                 Handles.EndGUI();
                 break;
 
         }
+    }
+
+    private void DrawScene(SceneData data, Color col)
+    {
+        var rectWithOffset = GetRectWithScreenOffset(data.rectangle);
+
+        if (ShowScenePreviews && !string.IsNullOrEmpty(data.name) && _previewCollection.ContainsKey(data.name))
+        {
+            if (_previewCollection.ContainsKey(data.name))
+                GUI.DrawTexture(rectWithOffset, _previewCollection[data.name]);
+        }
+
+        if (ShowSceneNames)
+            GUI.Label(rectWithOffset, string.IsNullOrEmpty(data.name) ? "<NO SCENE>" : data.name);
+
+
+        DrawSceneOutline(rectWithOffset, ref col);
+    }
+
+    private void DrawScene(int index, Color col)
+    {
+        DrawScene(_asset[index], col);
     }
 
     private Rect GetRectWithScreenOffset(SceneData data)
@@ -213,19 +241,15 @@ public sealed class SceneManagerWindow : EditorWindow
         return result;
     }
 
-    private void DrawSceneRectOutline(Rect rect, int index)
+    private void DrawSceneOutline(Rect rect, ref Color color)
     {
         if (!_asset)
             return;
 
         Color oldCol = Handles.color;
-        Handles.color = 
-            _selectedSceneIndex == index ? Color.red : 
-            _hoverSceneIndex    == index ? Color.yellow : Color.white;
+        Handles.color = color;
 
-        for(int i = 0; i < _asset.Count; i++)
-        {
-            var verts = new[]
+        var verts = new[]
         {
             new Vector2(rect.x, rect.y),
             new Vector2(rect.x + rect.width, rect.y),
@@ -233,17 +257,20 @@ public sealed class SceneManagerWindow : EditorWindow
             new Vector2(rect.x, rect.y + rect.height)
         };
 
-            Handles.DrawLine(verts[0], verts[1]);
-            Handles.DrawLine(verts[1], verts[2]);
-            Handles.DrawLine(verts[2], verts[3]);
-            Handles.DrawLine(verts[3], verts[0]);
-        }
+        Handles.DrawLine(verts[0], verts[1]);
+        Handles.DrawLine(verts[1], verts[2]);
+        Handles.DrawLine(verts[2], verts[3]);
+        Handles.DrawLine(verts[3], verts[0]);
+
 
         Handles.color = oldCol;
     }
 
     private void CalculateMinMaxSceneSizes()
     {
+        if (!_asset)
+            return;
+
         if (_asset.Count == 0)
             return;
 
@@ -529,5 +556,10 @@ public sealed class SceneManagerWindow : EditorWindow
             else
                 _flags &= ~WindowsSettingFlags.ShowSurroundingScenesInSceneView;
         }
+    }
+
+    public static SceneManagerWindow instance
+    {
+        get { return s_window; }
     }
 }
