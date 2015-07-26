@@ -128,13 +128,13 @@ public class SceneData
     public float width
     {
         get { return _rectangle.width; }
-        set { _rectangle.width = Mathf.Max((int)value, 10); }
+        set { _rectangle.width = Mathf.Max(Mathf.RoundToInt(value), 10); }
     }
 
     public float height
     {
         get { return _rectangle.height; }
-        set { _rectangle.height = Mathf.Max((int)value, 10); }
+        set { _rectangle.height = Mathf.Max(Mathf.RoundToInt(value), 10); }
     }
 
     public Rect rectangle
