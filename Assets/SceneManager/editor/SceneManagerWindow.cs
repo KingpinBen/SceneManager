@@ -120,6 +120,7 @@ public sealed class SceneManagerWindow : EditorWindow
             if (GUILayout.Button("Update Previews", EditorStyles.toolbarButton, new GUILayoutOption[0]))
             {
                 UpdateTexturePreviewCache();
+                AssetDatabase.Refresh();
             }
 
             if (GUILayout.Button("Focus Active Asset", EditorStyles.toolbarButton, new GUILayoutOption[0]))
@@ -522,7 +523,7 @@ public sealed class SceneManagerWindow : EditorWindow
             DontDestroyOnLoad(newCamera);
 
             _windowCamera = newCamera.AddComponent<Camera>();
-            _windowCamera.backgroundColor = new Color(49, 77, 121, 1);
+            _windowCamera.backgroundColor = Color.clear;
             _windowCamera.clearFlags = CameraClearFlags.Skybox;
         }
 
@@ -583,21 +584,24 @@ public sealed class SceneManagerWindow : EditorWindow
         _windowCamera.orthographicSize = sceneData.rectangle.height * .5f;
         _windowCamera.transform.position = new Vector3(sceneData.rectangle.center.x, sceneData.rectangle.y - sceneData.rectangle.height * .5f, -10);
 
-        var tempRT = RenderTexture.GetTemporary((int)sceneData.rectangle.width, (int)sceneData.rectangle.height, 16);
-        RenderTexture.active = tempRT;
+        var tempRT = RenderTexture.GetTemporary((int)sceneData.rectangle.width, (int)sceneData.rectangle.height, 16, RenderTextureFormat.ARGB32);
+        var final = new Texture2D(tempRT.width, tempRT.height, TextureFormat.ARGB32, false);
 
+        final.hideFlags = HideFlags.HideAndDontSave;
+        
         _windowCamera.targetTexture = tempRT;
+        RenderTexture.active = tempRT;
         _windowCamera.Render();
 
-        var image = new Texture2D(tempRT.width, tempRT.height, TextureFormat.ARGB32, false);
-        image.hideFlags = HideFlags.HideAndDontSave;
-        image.ReadPixels(new Rect(0, 0, image.width, image.height), 0, 0, false);
-        image.Apply();
+        final.ReadPixels(new Rect(0, 0, tempRT.width, tempRT.height), 0, 0);
+        final.Apply();
 
-        _previewCollection.Add(sceneData.name, image);
+        _previewCollection.Add(sceneData.name, final);
 
         RenderTexture.active = null;
         RenderTexture.ReleaseTemporary(tempRT);
+
+        Debug.Log(_windowCamera.backgroundColor + " " + _windowCamera.clearFlags.ToString());
     }
 
     private void HandleSceneManagerAssetDrop()
