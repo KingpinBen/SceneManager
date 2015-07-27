@@ -1,6 +1,4 @@
-﻿//#define DEBUG_SCREENMANAGER
-
-using UnityEngine;
+﻿using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
 
