@@ -125,15 +125,15 @@ public class SceneData
         set { _rectangle.yMax = value; }
     }
 
-    public float width
+    public int width
     {
-        get { return _rectangle.width; }
+        get { return (int)_rectangle.width; }
         set { _rectangle.width = Mathf.Max(Mathf.RoundToInt(value), 10); }
     }
 
-    public float height
+    public int height
     {
-        get { return _rectangle.height; }
+        get { return (int)_rectangle.height; }
         set { _rectangle.height = Mathf.Max(Mathf.RoundToInt(value), 10); }
     }
 
