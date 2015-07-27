@@ -24,6 +24,8 @@ public static partial class Extensions
 
     public static Vector2 ClosestPoint(this Rect rect, Vector2 other)
     {
-        return new Vector2(Mathf.Clamp(other.x, rect.x, rect.x + rect.width), Mathf.Clamp(other.y, rect.y - rect.height, rect.y));
+        return new Vector2(
+            Mathf.Clamp(other.x, rect.x, rect.x + rect.width),
+            Mathf.Clamp(other.y, rect.y - rect.height, rect.y));
     }
 }
