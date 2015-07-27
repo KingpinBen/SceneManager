@@ -25,8 +25,8 @@ public sealed class SceneManagerWindow : EditorWindow
     private bool _snapping;
     private Vector3[] _vertexCache = new Vector3[4];
 
-    private const int cSnapDistance = 10;
-    private const int cClickableEdgeDistance = 6;
+    private const int _cSnapDistance = 10;
+    private const int _cClickableEdgeDistance = 6;
     private static SceneManagerWindow s_window;
 
     [MenuItem("SceneManager/Scene Map Window")]
@@ -87,6 +87,71 @@ public sealed class SceneManagerWindow : EditorWindow
         EditorGUILayout.EndVertical();
     }
 
+    private void OnSceneGUI(SceneView sceneview)
+    {
+        var oldCol = Handles.color;
+        var data = _asset.TryFindScene(Path.GetFileNameWithoutExtension(EditorApplication.currentScene));
+        if (data == null)
+        {
+            Handles.BeginGUI();
+            GUILayout.Box("Scene wasn't found in the SceneManagerAsset. Cannot display boundaries.");
+            Handles.EndGUI();
+        }
+        else
+        {
+
+            _vertexCache[0] = new Vector2(data.x, data.y);
+            _vertexCache[1] = new Vector2(data.x + data.width, data.y);
+            _vertexCache[2] = new Vector2(data.x + data.width, data.y - data.height);
+            _vertexCache[3] = new Vector2(data.x, data.y - data.height);
+
+            Handles.DrawLine(_vertexCache[0], _vertexCache[1]);
+            Handles.DrawLine(_vertexCache[1], _vertexCache[2]);
+            Handles.DrawLine(_vertexCache[2], _vertexCache[3]);
+            Handles.DrawLine(_vertexCache[3], _vertexCache[0]);
+
+            Handles.color = Color.red;
+
+            Handles.DrawDottedLine(_vertexCache[0], _vertexCache[1], 3.0f);
+            Handles.DrawDottedLine(_vertexCache[1], _vertexCache[2], 3.0f);
+            Handles.DrawDottedLine(_vertexCache[2], _vertexCache[3], 3.0f);
+            Handles.DrawDottedLine(_vertexCache[3], _vertexCache[0], 3.0f);
+        }
+
+        var rect = new Rect();
+        if (ShowSurroundingScenesInSceneView)
+        {
+            Handles.BeginGUI();
+
+            GUI.color = Color.white * .75f;
+            for (int i = 0; i < _asset.Count; i++)
+            {
+                data = _asset[i];
+
+                if (SceneChange.Current == data.name)
+                    continue;
+
+                if (!_previewCollection.ContainsKey(data.name))
+                    continue;
+
+
+
+                var tl = SceneView.currentDrawingSceneView
+                    .camera.WorldToScreenPoint(new Vector3(data.x, data.y, 0));
+                var br = SceneView.currentDrawingSceneView
+                    .camera.WorldToScreenPoint(new Vector3(data.x + data.width, data.y + data.height, 0));
+
+                rect = new Rect(new Vector3(tl.x, sceneview.camera.pixelHeight - tl.y), new Vector3(br.x - tl.x, br.y - tl.y));
+
+                GUI.DrawTexture(rect, _previewCollection[_asset[i].name]);
+            }
+
+            Handles.EndGUI();
+        }
+
+        Handles.color = oldCol;
+    }
+
     private void HandleMouseDrag()
     {
         var e = Event.current;
@@ -143,6 +208,10 @@ public sealed class SceneManagerWindow : EditorWindow
         EditorGUILayout.EndHorizontal();
     }
 
+    /// <summary>
+    /// Handles various event types concerning the cells in the window
+    /// containing the map preview and layout. 
+    /// </summary>
     private void HandleMap()
     {
         int i;
@@ -226,6 +295,10 @@ public sealed class SceneManagerWindow : EditorWindow
         }
     }
 
+    /// <summary>
+    /// Handles code relating to the currently selected scene (if it exists).
+    /// 
+    /// </summary>
     private void HandleSelectedScene()
     {
         if (_selectedSceneIndex >= _asset.Count)
@@ -234,17 +307,20 @@ public sealed class SceneManagerWindow : EditorWindow
         if (_selectedSceneIndex < 0)
             return;
 
-        HandleDragSnappingScene();
-        HandleResizeDraggingScene();
-
         if (Event.current.type == EventType.repaint || Event.current.type == EventType.layout)
         {
             if (ShowSelectedSceneInfo)
                 DrawSceneInfoPopup();
         }
 
+        HandleSelectedSceneDragging();
+    }
+
+    private void HandleSelectedSceneDragging()
+    {
         switch (Event.current.type)
         {
+            #region Handles clicking on the edge to be draggable
             case EventType.mouseUp:
                 if (Event.current.button == 0)
                 {
@@ -255,65 +331,58 @@ public sealed class SceneManagerWindow : EditorWindow
             case EventType.mouseDown:
                 var mousePos = mousePositionInWorld;
                 var dataRect = _asset[_selectedSceneIndex].rectangle;
-                if (Mathf.Abs(mousePos.x - dataRect.x) < cClickableEdgeDistance)
-                {
+                if (Mathf.Abs(mousePos.x - dataRect.x) < _cClickableEdgeDistance)
                     _dragging = DraggingEdge.Left;
-                }
                 else
                 {
-                    if (Mathf.Abs(mousePos.x - (dataRect.x + dataRect.width)) < cClickableEdgeDistance)
-                    {
+                    if (Mathf.Abs(mousePos.x - (dataRect.x + dataRect.width)) < _cClickableEdgeDistance)
                         _dragging = DraggingEdge.Right;
-                    }
                     else
                     {
-                        if (Mathf.Abs(mousePos.y - dataRect.y) < cClickableEdgeDistance)
-                        {
+                        if (Mathf.Abs(mousePos.y - dataRect.y) < _cClickableEdgeDistance)
                             _dragging = DraggingEdge.Top;
-                        }
                         else
                         {
-                            if (Mathf.Abs(mousePos.y - (dataRect.y - dataRect.height)) < cClickableEdgeDistance)
-                            {
+                            if (Mathf.Abs(mousePos.y - (dataRect.y - dataRect.height)) < _cClickableEdgeDistance)
                                 _dragging = DraggingEdge.Bottom;
-                            }
                             else
-                            {
                                 _dragging = DraggingEdge.None;
-                            }
                         }
                     }
                 }
+                
                 break;
+            #endregion
+            #region Draw the edge being dragged (if any)
             case EventType.repaint:
                 if (_dragging == DraggingEdge.None)
                     return;
 
                 Rect rect = GetRectWithScreenOffset(_asset[_selectedSceneIndex]);
 
-                switch(_dragging)
+                switch (_dragging)
                 {
                     case DraggingEdge.Left:
                         _vertexCache[0] = new Vector3(rect.x + 1, rect.y + 1);
-                        _vertexCache[1] = new Vector3(rect.x + cClickableEdgeDistance - 1, rect.y + 1);
-                        _vertexCache[2] = new Vector3(rect.x + cClickableEdgeDistance - 1, rect.yMax - 1);
+                        _vertexCache[1] = new Vector3(rect.x + _cClickableEdgeDistance - 1, rect.y + 1);
+                        _vertexCache[2] = new Vector3(rect.x + _cClickableEdgeDistance - 1, rect.yMax - 1);
                         _vertexCache[3] = new Vector3(rect.x + 1, rect.yMax - 1);
                         break;
                     case DraggingEdge.Top:
                         _vertexCache[0] = new Vector3(rect.x + 1, rect.y + 1);
                         _vertexCache[1] = new Vector3(rect.x + rect.width, rect.y + 1);
-                        _vertexCache[2] = new Vector3(rect.x + rect.width, rect.y + cClickableEdgeDistance - 1);
-                        _vertexCache[3] = new Vector3(rect.x + 1, rect.y + cClickableEdgeDistance - 1);
+                        _vertexCache[2] = new Vector3(rect.x + rect.width, rect.y + _cClickableEdgeDistance - 1);
+                        _vertexCache[3] = new Vector3(rect.x + 1, rect.y + _cClickableEdgeDistance - 1);
                         break;
                     case DraggingEdge.Right:
-                        _vertexCache[0] = new Vector3(rect.x + rect.width - cClickableEdgeDistance + 1, rect.y + 1);
+                        _vertexCache[0] = new Vector3(rect.x + rect.width - _cClickableEdgeDistance + 1, rect.y + 1);
                         _vertexCache[1] = new Vector3(rect.x + rect.width, rect.y + 1);
                         _vertexCache[2] = new Vector3(rect.x + rect.width, rect.yMax - 1);
-                        _vertexCache[3] = new Vector3(rect.x + rect.width - cClickableEdgeDistance + 1, rect.yMax - 1);
+                        _vertexCache[3] = new Vector3(rect.x + rect.width - _cClickableEdgeDistance + 1, rect.yMax - 1);
                         break;
                     case DraggingEdge.Bottom:
-                        _vertexCache[0] = new Vector3(rect.x + 1, rect.yMax - cClickableEdgeDistance + 1);
-                        _vertexCache[1] = new Vector3(rect.xMax, rect.yMax - cClickableEdgeDistance + 1);
+                        _vertexCache[0] = new Vector3(rect.x + 1, rect.yMax - _cClickableEdgeDistance + 1);
+                        _vertexCache[1] = new Vector3(rect.xMax, rect.yMax - _cClickableEdgeDistance + 1);
                         _vertexCache[2] = new Vector3(rect.xMax, rect.yMax - 1);
                         _vertexCache[3] = new Vector3(rect.x + 1, rect.yMax - 1);
                         break;
@@ -321,9 +390,12 @@ public sealed class SceneManagerWindow : EditorWindow
                 }
 
                 Handles.DrawSolidRectangleWithOutline(_vertexCache, Color.cyan * .7f, Color.clear);
-
                 break;
+                #endregion
         }
+
+        HandleDragSnappingScene();
+        HandleResizeDraggingScene();
     }
 
     private void HandleResizeDraggingScene()
@@ -334,14 +406,11 @@ public sealed class SceneManagerWindow : EditorWindow
         if (_dragging == DraggingEdge.None)
             return;
 
-        if (_selectedSceneIndex < 0)
+        if (_snapping)
             return;
 
         var data = _asset[_selectedSceneIndex];
         Undo.RecordObject(_asset, "Resize");
-
-        if (_snapping)
-            return;
 
         if (_dragging == DraggingEdge.Left || _dragging == DraggingEdge.Top)
         {
@@ -400,7 +469,7 @@ public sealed class SceneManagerWindow : EditorWindow
             closestRect.y += closestRect.height;
             closestPoint = closestRect.ClosestPoint(Event.current.mousePosition);
 
-            if ((closestPoint - mousePos).magnitude > cClickableEdgeDistance)
+            if ((closestPoint - mousePos).magnitude > _cClickableEdgeDistance)
                 continue;
 
             switch(_dragging)
@@ -408,11 +477,11 @@ public sealed class SceneManagerWindow : EditorWindow
                 case DraggingEdge.Top:
                 case DraggingEdge.Bottom:
                     closestRect.y -= closestRect.height;
-                    var y = Mathf.Abs(mousePos.y - closestRect.y) < cSnapDistance;
+                    var y = Mathf.Abs(mousePos.y - closestRect.y) < _cSnapDistance;
 
                     //  Save y bool as we can use it later, second conditional is yMax check. 
                     //  We can just use !y past this if as one of them is true
-                    if (!y && !(Mathf.Abs(mousePos.y - closestRect.yMax) < cSnapDistance))
+                    if (!y && !(Mathf.Abs(mousePos.y - closestRect.yMax) < _cSnapDistance))
                         continue;
 
                     _snapping = true;
@@ -440,8 +509,8 @@ public sealed class SceneManagerWindow : EditorWindow
                     break;
                 case DraggingEdge.Left:
                 case DraggingEdge.Right:
-                    var x = Mathf.Abs(mousePos.x - closestRect.x) < cSnapDistance;
-                    if (!x && !(Mathf.Abs(mousePos.x - closestRect.xMax) < cSnapDistance))
+                    var x = Mathf.Abs(mousePos.x - closestRect.x) < _cSnapDistance;
+                    if (!x && !(Mathf.Abs(mousePos.x - closestRect.xMax) < _cSnapDistance))
                         continue;
 
                     if (_dragging == DraggingEdge.Left)
@@ -484,7 +553,6 @@ public sealed class SceneManagerWindow : EditorWindow
 
         if (ShowSceneNames)
             GUI.Label(rectWithOffset, string.IsNullOrEmpty(data.name) ? "<NO SCENE>" : data.name);
-
 
         DrawSceneOutline(rectWithOffset, ref col);
     }
@@ -737,70 +805,7 @@ public sealed class SceneManagerWindow : EditorWindow
         Repaint();
     }
 
-    private void OnSceneGUI(SceneView sceneview)
-    {
-        var oldCol = Handles.color;
-        var data = _asset.TryFindScene(Path.GetFileNameWithoutExtension(EditorApplication.currentScene));
-        if (data == null)
-        {
-            Handles.BeginGUI();
-            GUILayout.Box("Scene wasn't found in the SceneManagerAsset. Cannot display boundaries.");
-            Handles.EndGUI();
-        }
-        else
-        {
-
-            _vertexCache[0] = new Vector2(data.x, data.y);
-            _vertexCache[1] = new Vector2(data.x + data.width, data.y);
-            _vertexCache[2] = new Vector2(data.x + data.width, data.y - data.height);
-            _vertexCache[3] = new Vector2(data.x, data.y - data.height);
-
-            Handles.DrawLine(_vertexCache[0], _vertexCache[1]);
-            Handles.DrawLine(_vertexCache[1], _vertexCache[2]);
-            Handles.DrawLine(_vertexCache[2], _vertexCache[3]);
-            Handles.DrawLine(_vertexCache[3], _vertexCache[0]);
-
-            Handles.color = Color.red;
-            
-            Handles.DrawDottedLine(_vertexCache[0], _vertexCache[1], 3.0f);
-            Handles.DrawDottedLine(_vertexCache[1], _vertexCache[2], 3.0f);
-            Handles.DrawDottedLine(_vertexCache[2], _vertexCache[3], 3.0f);
-            Handles.DrawDottedLine(_vertexCache[3], _vertexCache[0], 3.0f);
-        }
-
-        var rect = new Rect();
-        if (ShowSurroundingScenesInSceneView)
-        {
-            Handles.BeginGUI();
-
-            GUI.color = Color.white * .75f;
-            for (int i = 0; i < _asset.Count; i++)
-            {
-                data = _asset[i];
-
-                if (SceneChange.Current == data.name)
-                    continue;
-
-                if (!_previewCollection.ContainsKey(data.name))
-                    continue;
-
-                
-
-                var tl = SceneView.currentDrawingSceneView
-                    .camera.WorldToScreenPoint(new Vector3(data.x, data.y, 0));
-                var br = SceneView.currentDrawingSceneView
-                    .camera.WorldToScreenPoint(new Vector3(data.x + data.width, data.y + data.height, 0));
-
-                rect = new Rect(new Vector3(tl.x, sceneview.camera.pixelHeight - tl.y), new Vector3(br.x - tl.x, br.y - tl.y));
-                
-                GUI.DrawTexture(rect, _previewCollection[_asset[i].name]);
-            }
-
-            Handles.EndGUI();
-        }
-        
-        Handles.color = oldCol;
-    }
+    #region Properties and Enums
 
     private Vector2 mousePositionInWorld
     {
@@ -874,11 +879,6 @@ public sealed class SceneManagerWindow : EditorWindow
         }
     }
 
-    public static SceneManagerWindow instance
-    {
-        get { return s_window; }
-    }
-
     [Flags]
     private enum WindowsSettingFlags
     {
@@ -896,5 +896,12 @@ public sealed class SceneManagerWindow : EditorWindow
         Top = 2,
         Right = 3,
         Bottom = 4
+    }
+
+    #endregion
+
+    public static SceneManagerWindow instance
+    {
+        get { return s_window; }
     }
 }
