@@ -642,21 +642,19 @@ public sealed class SceneManagerWindow : EditorWindow
 
     private void DrawOptionsPopup()
     {
-        using (var scope = new EditorGUILayout.VerticalScope("Box", GUILayout.Width(350)))
+        if (_asset)
         {
-            if (_asset)
-            {
-                GUILayout.Label(string.Format("{0} : [{1} Scenes Total]", _asset.name, _asset.Count));
-                ShowSceneNames = GUILayout.Toggle(ShowSceneNames, "Show Scene Names");
-                ShowScenePreviews = GUILayout.Toggle(ShowScenePreviews, "Show Scene Previews");
-                ShowSurroundingScenesInSceneView = GUILayout.Toggle(ShowSurroundingScenesInSceneView, "Show Surrounding Scene Previews in SceneView");
-                ShowSelectedSceneInfo = GUILayout.Toggle(ShowSelectedSceneInfo, "Show Selected Scene Info Popup");
-
-            }
-            else
-            {
-                GUILayout.Label("No asset assigned. Drag one onto the window");
-            }
+            GUILayout.BeginArea(new Rect(position.width - 355, 16f, 350, 16f * 6), GUIContent.none, "Box");
+            GUILayout.Label(string.Format("{0} : [{1} Scenes Total]", _asset.name, _asset.Count));
+            ShowSceneNames = GUILayout.Toggle(ShowSceneNames, "Show Scene Names");
+            ShowScenePreviews = GUILayout.Toggle(ShowScenePreviews, "Show Scene Previews");
+            ShowSurroundingScenesInSceneView = GUILayout.Toggle(ShowSurroundingScenesInSceneView, "Show Surrounding Scene Previews in SceneView");
+            ShowSelectedSceneInfo = GUILayout.Toggle(ShowSelectedSceneInfo, "Show Selected Scene Info Popup");
+            GUILayout.EndArea();
+        }
+        else
+        {
+            GUILayout.Label("No asset assigned. Drag one onto the window");
         }
     }
 
