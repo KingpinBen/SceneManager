@@ -13,7 +13,6 @@ public class SceneManagerAssetEditor : Editor
     public static readonly GUIContent cMissingSceneNameContent =
         new GUIContent("No Scene", EditorGUIUtility.IconContent("console.warnicon").image);
 
-
     private void OnEnable()
     {
         _target = target as SceneManagerAsset;
@@ -108,8 +107,8 @@ public class SceneManagerAssetEditor : Editor
 
             dirty = dirty || (vec.x != sceneData.width || vec.y != sceneData.height);
 
-            sceneData.width = vec.x;
-            sceneData.height = vec.y;
+            sceneData.width = (int)vec.x;
+            sceneData.height = (int)vec.y;
 
             EditorGUILayout.EndVertical();
             EditorGUI.indentLevel--;

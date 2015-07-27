@@ -22,9 +22,10 @@ public sealed class SceneManagerWindow : EditorWindow
     private Vector2 _windowContentsOffset;
     private Rect _scenesMinMaxSize = new Rect();
     private DraggingEdge _dragging;
+    private bool _snapping;
     private Vector3[] _vertexCache = new Vector3[4];
 
-    private const int cSnapDistance = 3;
+    private const int cSnapDistance = 10;
     private const int cClickableEdgeDistance = 6;
     private static SceneManagerWindow s_window;
 
@@ -76,7 +77,6 @@ public sealed class SceneManagerWindow : EditorWindow
         {
             HandleMap();
             HandleSelectedScene();
-            
         }
 
         if (ShowOptions)
@@ -234,6 +234,7 @@ public sealed class SceneManagerWindow : EditorWindow
         if (_selectedSceneIndex < 0)
             return;
 
+        HandleDragSnappingScene();
         HandleResizeDraggingScene();
 
         if (Event.current.type == EventType.repaint || Event.current.type == EventType.layout)
@@ -339,6 +340,9 @@ public sealed class SceneManagerWindow : EditorWindow
         var data = _asset[_selectedSceneIndex];
         Undo.RecordObject(_asset, "Resize");
 
+        if (_snapping)
+            return;
+
         if (_dragging == DraggingEdge.Left || _dragging == DraggingEdge.Top)
         {
             float oldValue;
@@ -366,6 +370,106 @@ public sealed class SceneManagerWindow : EditorWindow
         }
 
         Repaint();
+    }
+
+    private void HandleDragSnappingScene()
+    {
+        if (_dragging == DraggingEdge.None)
+            return;
+
+        _snapping = false;
+
+        if (!(Event.current.modifiers == EventModifiers.Control ||
+            Event.current.modifiers == EventModifiers.Command))
+            return;
+
+        Rect closestRect;
+        Vector2 closestPoint;
+        Vector2 mousePos = Event.current.mousePosition;
+        var selectedData = _asset[_selectedSceneIndex];
+        
+        for (int i = 0; i < _asset.Count; i++)
+        {
+            if (i == _selectedSceneIndex)
+                continue;
+
+            closestRect = GetRectWithScreenOffset(_asset[i]);
+            
+            //  We need to add the height to flip the rect up to get it to the correct 
+            //  coords. When we're working with the y again, we need to flip it back
+            closestRect.y += closestRect.height;
+            closestPoint = closestRect.ClosestPoint(Event.current.mousePosition);
+
+            if ((closestPoint - mousePos).magnitude > cClickableEdgeDistance)
+                continue;
+
+            switch(_dragging)
+            {
+                case DraggingEdge.Top:
+                case DraggingEdge.Bottom:
+                    closestRect.y -= closestRect.height;
+                    var y = Mathf.Abs(mousePos.y - closestRect.y) < cSnapDistance;
+
+                    //  Save y bool as we can use it later, second conditional is yMax check. 
+                    //  We can just use !y past this if as one of them is true
+                    if (!y && !(Mathf.Abs(mousePos.y - closestRect.yMax) < cSnapDistance))
+                        continue;
+
+                    _snapping = true;
+
+                    if (_dragging == DraggingEdge.Top)
+                    {
+                        int oldValue = selectedData.y;
+                        if (y)
+                            selectedData.y = _asset[i].y;
+                        else
+                            selectedData.y = _asset[i].y - _asset[i].height;
+
+                        selectedData.height += (selectedData.y - oldValue);
+                        Repaint();
+                    }
+                    else
+                    {
+                        if (y)
+                            selectedData.height = (selectedData.y - _asset[i].y);
+                        else
+                            selectedData.height = (selectedData.y - _asset[i].y) + _asset[i].height;
+
+                        Repaint();
+                    }
+                    break;
+                case DraggingEdge.Left:
+                case DraggingEdge.Right:
+                    var x = Mathf.Abs(mousePos.x - closestRect.x) < cSnapDistance;
+                    if (!x && !(Mathf.Abs(mousePos.x - closestRect.xMax) < cSnapDistance))
+                        continue;
+
+                    if (_dragging == DraggingEdge.Left)
+                    {
+                        int oldValue = selectedData.x;
+                        if (x)
+                            selectedData.x = _asset[i].x;
+                        else
+                            selectedData.x = _asset[i].xMax;
+
+                        selectedData.width += (oldValue - selectedData.x);
+                        Repaint();
+                    }
+                    else
+                    {
+                        if (x)
+                            selectedData.xMax = _asset[i].x;
+                        else
+                            selectedData.xMax = _asset[i].xMax;
+
+                        Repaint();
+                    }
+
+                    break;
+            }
+
+           
+        }
     }
 
     private void DrawScene(SceneData data, Color col)
@@ -600,8 +704,6 @@ public sealed class SceneManagerWindow : EditorWindow
 
         RenderTexture.active = null;
         RenderTexture.ReleaseTemporary(tempRT);
-
-        Debug.Log(_windowCamera.backgroundColor + " " + _windowCamera.clearFlags.ToString());
     }
 
     private void HandleSceneManagerAssetDrop()
