@@ -11,7 +11,7 @@ public sealed class ScenePreviewCollection
 
     private const string cSceneImagesPreviewFolderName = "Scene Previews";
 
-    public ScenePreviewCollection(SceneCollection sceneCollection)
+    public ScenePreviewCollection(ProjectSceneCollection sceneCollection)
     {
         _texturePreviewCache = new Dictionary<string, Texture2D>();
 
