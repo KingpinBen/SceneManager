@@ -17,7 +17,6 @@ public class SceneManagerEditor : Editor
         if (!EditorApplication.isPlaying)
             return;
 
-        Debug.Log("Drawing");
         Handles.CircleCap(0, _target.targetPositionAsVec2, Quaternion.identity, SceneManager.cBufferArea *.5f);
     }
 }
