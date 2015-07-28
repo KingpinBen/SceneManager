@@ -10,7 +10,7 @@ using System.IO;
 
 public class ManagedSceneObject : MonoBehaviour
 {
-    [SerializeField]
+    [SerializeField, HideInInspector]
     private string _sceneName;
     [SerializeField]
     private Transform _sceneTraversables;
