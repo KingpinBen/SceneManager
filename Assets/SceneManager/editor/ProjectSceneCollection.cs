@@ -3,14 +3,14 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 
-public sealed class SceneCollection
+public sealed class ProjectSceneCollection
 {
     private Dictionary<string, string> _relativeScenePaths;
     private List<string> _sceneList;
 
     private const string cSceneExtension = ".unity";
 
-    public SceneCollection()
+    public ProjectSceneCollection()
     {
         _relativeScenePaths = new Dictionary<string, string>();
         _sceneList = new List<string>();
