@@ -7,10 +7,10 @@ using System.Collections.Generic;
 using UnityEditor;
 #endif
 
-public sealed class SceneManagerAsset : ScriptableObject
+public sealed class SceneCollectionAsset : ScriptableObject
 {
     [SerializeField]
-    private SceneData[] _sceneData;
+    private SceneData[] _sceneData = new SceneData[0];
 
     public int Count
     {
@@ -56,10 +56,10 @@ public sealed class SceneManagerAsset : ScriptableObject
 #if UNITY_EDITOR
 
     [MenuItem("SceneManager/Create Scene Collection Asset")]
-    public static void CreateSceneManagerAsset()
+    public static void CreateSceneCollectionAsset()
     {
-        var asset = CreateInstance<SceneManagerAsset>();
-        var pathAndName = AssetDatabase.GenerateUniqueAssetPath(string.Format("Assets/New {0}.asset", typeof(SceneManagerAsset).ToString()));
+        var asset = CreateInstance<SceneCollectionAsset>();
+        var pathAndName = AssetDatabase.GenerateUniqueAssetPath("Assets/New Scene Collection.asset");
         AssetDatabase.CreateAsset(asset, pathAndName);
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();

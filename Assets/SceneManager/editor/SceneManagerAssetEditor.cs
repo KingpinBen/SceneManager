@@ -3,10 +3,10 @@ using System.Collections;
 using UnityEditor;
 using System.Collections.Generic;
 
-[CustomEditor(typeof(SceneManagerAsset))]
+[CustomEditor(typeof(SceneCollectionAsset))]
 public class SceneManagerAssetEditor : Editor
 {
-    private SceneManagerAsset _target;
+    private SceneCollectionAsset _target;
 
     private static HashSet<string> _shownScenes;
     private static GUIContent _deleteSceneButtonContent = EditorGUIUtility.IconContent("TreeEditor.Trash");
@@ -15,7 +15,7 @@ public class SceneManagerAssetEditor : Editor
 
     private void OnEnable()
     {
-        _target = target as SceneManagerAsset;
+        _target = target as SceneCollectionAsset;
 
         if (_shownScenes == null)
             _shownScenes = new HashSet<string>();

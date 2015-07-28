@@ -9,9 +9,9 @@ using System;
 public sealed class SceneManagerWindow : EditorWindow
 {
     [SerializeField]
-    private SceneManagerAsset _asset;
+    private SceneCollectionAsset _asset;
 
-    private SceneCollection _sceneCollection;
+    private ProjectSceneCollection _projectSceneCollection;
     private ScenePreviewCollection _previewCollection;
     private string _scenePreviewImagesFolder;
     private Camera _windowCamera;
@@ -38,18 +38,19 @@ public sealed class SceneManagerWindow : EditorWindow
 
     private void OnEnable()
     {
-        _sceneCollection = new SceneCollection();
-        _previewCollection = new ScenePreviewCollection(_sceneCollection);
+        _projectSceneCollection = new ProjectSceneCollection();
+        _previewCollection = new ScenePreviewCollection(_projectSceneCollection);
 
         titleContent = new GUIContent("Scene Map");
 
-        _sceneCollection.UpdateRelativePaths();
+        _projectSceneCollection.UpdateRelativePaths();
 
         SceneView.onSceneGUIDelegate += OnSceneGUI;
         SceneChange.OnSceneChange += UpdateScenePreviewImage;
         Undo.undoRedoPerformed += Repaint;
 
         ShowScenePreviews = true;
+        wantsMouseMove = true;
 
         CalculateMinMaxSceneSizes();
         _windowContentsOffset = _scenesMinMaxSize.center;
@@ -89,6 +90,10 @@ public sealed class SceneManagerWindow : EditorWindow
 
     private void OnSceneGUI(SceneView sceneview)
     {
+        //  Current scene isn't saved so don't try to find it.
+        if (string.IsNullOrEmpty(EditorApplication.currentScene) || !_asset)
+            return;
+
         var oldCol = Handles.color;
         var data = _asset.TryFindScene(Path.GetFileNameWithoutExtension(EditorApplication.currentScene));
         if (data == null)
@@ -201,7 +206,7 @@ public sealed class SceneManagerWindow : EditorWindow
         else
         {
             GUILayout.FlexibleSpace();
-            GUILayout.Label("Drag a SceneManagerAsset onto the window");
+            GUILayout.Label("Drag a SceneCollectionAsset onto the window");
             GUILayout.FlexibleSpace();
         }
 
@@ -219,10 +224,12 @@ public sealed class SceneManagerWindow : EditorWindow
 
         //  I chose the method of a switch with loops in each to avoid 
         //  unnecessary Begin/EndGUI() calls
+
         switch (Event.current.type)
         {
-            case EventType.mouseMove:
+            case EventType.MouseMove:
                 _hoverSceneIndex = -1;
+                
                 for (i = 0; i < _asset.Count; i++)
                 {
                     rectWithOffset = GetRectWithScreenOffset(_asset[i].rectangle);
@@ -239,6 +246,7 @@ public sealed class SceneManagerWindow : EditorWindow
                 //  The left button has been clicked so deselect the current scene if it exists
                 if (Event.current.button == 0)
                     _selectedSceneIndex = -1;
+                else break;
 
                 for (i = 0; i < _asset.Count; i++)
                 {
@@ -249,14 +257,16 @@ public sealed class SceneManagerWindow : EditorWindow
                         if (Event.current.type == EventType.MouseDown && Event.current.button == 0)
                         {
                             _selectedSceneIndex = i;
+                            _dragging = DraggingEdge.None;
                             Selection.activeObject = _asset;
+
                             if (Event.current.clickCount == 2)
                             {
-                                if (_sceneCollection.SceneExists(_asset[i].name) &&
+                                if (_projectSceneCollection.SceneExists(_asset[i].name) &&
                                     EditorUtility.DisplayDialog("Open Scene",
                                         "Are you sure you want to open the scene?", "Yes", "No"))
                                 {
-                                    EditorApplication.OpenScene(_sceneCollection.GetRelativeScenePath(_asset[i].name));
+                                    EditorApplication.OpenScene(_projectSceneCollection.GetRelativeScenePath(_asset[i].name));
                                 }
                             }
                             else
@@ -536,8 +546,6 @@ public sealed class SceneManagerWindow : EditorWindow
 
                     break;
             }
-
-           
         }
     }
 
@@ -715,18 +723,18 @@ public sealed class SceneManagerWindow : EditorWindow
         EditorApplication.SaveCurrentSceneIfUserWantsTo();
         var startScene = EditorApplication.currentScene;
         
-        for (int i = 0; i < _sceneCollection.Count; i++)
+        for (int i = 0; i < _projectSceneCollection.Count; i++)
         {
-            var sceneData = _asset.TryFindScene(_sceneCollection[i]);
+            var sceneData = _asset.TryFindScene(_projectSceneCollection[i]);
 
             if (sceneData == null)
                 continue;
 
-            if (!_sceneCollection.SceneExists(sceneData.name))
+            if (!_projectSceneCollection.SceneExists(sceneData.name))
                 continue;
 
-            if (EditorApplication.currentScene != _sceneCollection.GetRelativeScenePath(sceneData.name))
-                EditorApplication.OpenScene(_sceneCollection.GetRelativeScenePath(sceneData.name));
+            if (EditorApplication.currentScene != _projectSceneCollection.GetRelativeScenePath(sceneData.name))
+                EditorApplication.OpenScene(_projectSceneCollection.GetRelativeScenePath(sceneData.name));
 
             UpdateScenePreviewImage(sceneData);
         }
@@ -782,13 +790,13 @@ public sealed class SceneManagerWindow : EditorWindow
         if (e.type == EventType.DragUpdated || e.type == EventType.DragPerform)
         {
             var acceptableDrag = DragAndDrop.objectReferences.Length == 1 &&
-                DragAndDrop.objectReferences[0] is SceneManagerAsset;
+                DragAndDrop.objectReferences[0] is SceneCollectionAsset;
 
             DragAndDrop.visualMode = acceptableDrag ? DragAndDropVisualMode.Link : DragAndDropVisualMode.Rejected;
 
             if (acceptableDrag && e.type == EventType.DragPerform)
             {
-                SetSceneManagerAsset(DragAndDrop.objectReferences[0] as SceneManagerAsset);
+                SetSceneManagerAsset(DragAndDrop.objectReferences[0] as SceneCollectionAsset);
                 DragAndDrop.AcceptDrag();
             }
 
@@ -796,7 +804,7 @@ public sealed class SceneManagerWindow : EditorWindow
         }
     }
 
-    private void SetSceneManagerAsset(SceneManagerAsset asset)
+    private void SetSceneManagerAsset(SceneCollectionAsset asset)
     {
         _asset = asset;
 

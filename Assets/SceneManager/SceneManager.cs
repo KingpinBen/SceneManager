@@ -5,7 +5,7 @@ using System.Collections.Generic;
 public sealed class SceneManager : MonoBehaviour
 {
     [SerializeField]
-    private SceneManagerAsset _sceneManagerAsset;
+    private SceneCollectionAsset _sceneManagerAsset;
     private Dictionary<int, ManagedSceneObject> _sceneBaseObjects;
     private HashSet<int> _activeScenes;
     private float _sqrBufferArea;
@@ -22,6 +22,9 @@ public sealed class SceneManager : MonoBehaviour
         }
         else
         {
+            if (!_sceneManagerAsset)
+                throw new UnityException("Asset is empty. Make sure it is set to reference a SceneCollectionAsset");
+
             DontDestroyOnLoad(this);
 
             _sceneBaseObjects = new Dictionary<int, ManagedSceneObject>();
@@ -186,7 +189,7 @@ public sealed class SceneManager : MonoBehaviour
     }
 
 #if UNITY_EDITOR
-    public SceneManagerAsset Asset
+    public SceneCollectionAsset Asset
     {
         get { return _sceneManagerAsset; }
         set { _sceneManagerAsset = value; }
